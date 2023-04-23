@@ -9,14 +9,21 @@ import com.example.myapplication.models.Article
 import com.example.myapplication.rest.NewsApiService
 import com.example.myapplication.rest.NewsRepo
 import com.example.myapplication.rest.RetrofitHelper
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 import kotlinx.coroutines.launch
 
 class MainViewModel : ViewModel() {
 
     private val _articles = MutableLiveData<Result<List<Article>>>()
     val articles: LiveData<Result<List<Article>>> = _articles
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean>
+        get() = _isRefreshing.asStateFlow()
 
-    fun loadNews() {
+     fun refresh() {
         viewModelScope.launch {
             _articles.postValue(Result.loading())
             try {
@@ -29,6 +36,7 @@ class MainViewModel : ViewModel() {
                 _articles.postValue(Result.error(e))
             }
         }
+        _isRefreshing.tryEmit(false)
     }
 }
 

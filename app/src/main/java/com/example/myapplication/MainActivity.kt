@@ -15,6 +15,9 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,9 +33,10 @@ import com.example.myapplication.models.Article
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        viewModel.loadNews()
+        viewModel.refresh()
         viewModel.articles.observe(this) { articleList ->
             setContent {
 
@@ -77,137 +81,148 @@ class MainActivity : ComponentActivity() {
 
         }
     }
-}
 
-@Composable
-fun SearchBar(
-    onSearch: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var searchText by remember { mutableStateOf("") }
 
-    TextField(
-        value = searchText,
-        onValueChange = { newValue: String -> searchText = newValue },
-        modifier = modifier,
-        placeholder = { Text("Search") },
-        keyboardOptions = KeyboardOptions(
-            imeAction = ImeAction.Search
-        ),
-        keyboardActions = KeyboardActions(
-            onSearch = { onSearch(searchText) }
-        ),
-        leadingIcon = {
-            IconButton(
-                onClick = { onSearch(searchText) },
-                modifier = Modifier.size(50.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = "Search"
-                )
-            }
-        },
-        trailingIcon = {
-            IconButton(
-                onClick = { }
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.List,
-                    tint = Color.Black,
-                    contentDescription = "Filter",
-                    modifier = Modifier
-                        .size(50.dp)
-                )
-            }
-        }
-    )
-}
+    @Composable
+    fun SearchBar(
+        onSearch: (String) -> Unit,
+        modifier: Modifier = Modifier
+    ) {
+        var searchText by remember { mutableStateOf("") }
 
-@Composable
-fun ArticleList(articleResult: Result<List<Article>>) {
-    when (articleResult) {
-        is Result.Success -> {
-            val articles = articleResult.data
-            LazyColumn {
-                items(articles) { article ->
-                    Card(
+        TextField(
+            value = searchText,
+            onValueChange = { newValue: String -> searchText = newValue },
+            modifier = modifier,
+            placeholder = { Text("Search") },
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Search
+            ),
+            keyboardActions = KeyboardActions(
+                onSearch = { onSearch(searchText) }
+            ),
+            leadingIcon = {
+                IconButton(
+                    onClick = { onSearch(searchText) },
+                    modifier = Modifier.size(50.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "Search"
+                    )
+                }
+            },
+            trailingIcon = {
+                IconButton(
+                    onClick = { }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.List,
+                        tint = Color.Black,
+                        contentDescription = "Filter",
                         modifier = Modifier
-                            .padding(10.dp)
-                            .height(140.dp)
-                            .fillMaxWidth(),
-                        shape = RoundedCornerShape(7.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Color(0xFFcacbcc)
-                                ),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .width(140.dp)
-                                    .height(140.dp)
-                                    .background(Color.Red)
-                            ) {
-                                AsyncImage(
-                                    model = article.urlToImage,
-                                    contentDescription = article.title,
-                                    placeholder = painterResource(id = R.drawable.image6),
-                                    modifier = Modifier.fillMaxHeight(),
-                                    contentScale = ContentScale.FillHeight
-                                )
-                            }
-                            Column(
+                            .size(50.dp)
+                    )
+                }
+            }
+        )
+    }
+
+    @OptIn(ExperimentalMaterialApi::class)
+    @Composable
+    fun ArticleList(articleResult: Result<List<Article>>) {
+        val isRefreshing by viewModel.isRefreshing.collectAsState()
+        val pullRefreshState = rememberPullRefreshState(isRefreshing, { viewModel.refresh() })
+
+        Box(modifier = Modifier.pullRefresh(pullRefreshState)) {
+            when (articleResult) {
+                is Result.Success -> {
+                    val articles = articleResult.data
+                    LazyColumn {
+                        items(articles) { article ->
+                            Card(
                                 modifier = Modifier
                                     .padding(10.dp)
-                                    .fillMaxSize(),
-                                verticalArrangement = Arrangement.SpaceAround
+                                    .height(140.dp)
+                                    .fillMaxWidth(),
+                                shape = RoundedCornerShape(7.dp)
                             ) {
-                                Text(
-                                    text = article.source.name,
-                                    style = MaterialTheme.typography.subtitle1,
-                                )
-                                Text(
-                                    text = article.title,
-                                    style = MaterialTheme.typography.body1,
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Color(0xFFcacbcc)
+                                        ),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .width(140.dp)
+                                            .height(140.dp)
+                                            .background(Color.Red)
+                                    ) {
+                                        AsyncImage(
+                                            model = article.urlToImage,
+                                            contentDescription = article.title,
+                                            placeholder = painterResource(id = R.drawable.image6),
+                                            modifier = Modifier.fillMaxHeight(),
+                                            contentScale = ContentScale.FillHeight
+                                        )
+                                    }
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(10.dp)
+                                            .fillMaxSize(),
+                                        verticalArrangement = Arrangement.SpaceAround
+                                    ) {
+                                        Text(
+                                            text = article.source.name,
+                                            style = MaterialTheme.typography.subtitle1,
+                                        )
+                                        Text(
+                                            text = article.title,
+                                            style = MaterialTheme.typography.body1,
 
-                                    )
-                                Text(
-                                    text = article.author,
-                                    style = MaterialTheme.typography.subtitle2,
-                                )
+                                            )
+                                        Text(
+                                            text = article.author,
+                                            style = MaterialTheme.typography.subtitle2,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
+                is Result.Error -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            style = MaterialTheme.typography.h2,
+                            color = Color.Red,
+                            text = "Something went wrong!"
+                        )
+                    }
+                }
+                else -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .size(80.dp),
+                            color = Color(0xFF011b45)
+                        )
+                    }
+                }
             }
+
+            PullRefreshIndicator(isRefreshing, pullRefreshState, Modifier.align(Alignment.TopCenter))
+
         }
-        is Result.Error -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    style = MaterialTheme.typography.h2,
-                    color = Color.Red,
-                    text = "Something went wrong!"
-                )
-            }
-        }
-        else -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(80.dp),
-                    color = Color(0xFF011b45)
-                )
-            }
-        }
+
     }
 }
