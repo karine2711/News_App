@@ -1,6 +1,5 @@
 package com.example.myapplication.models
 
-
 data class ArticleResponse(
     val articles: List<Article>,
     val status: String,
@@ -10,8 +9,12 @@ data class ArticleResponse(
 data class Article(
     val source: SourceResponse,
     val title: String,
-    val author: String,
-    val urlToImage: String?
+    val author: String?,
+    val urlToImage: String?,
+    val content:String,
+    val description:String,
+    val publishedAt: String,
+    val url:String
 )
 
 data class SourceResponse(

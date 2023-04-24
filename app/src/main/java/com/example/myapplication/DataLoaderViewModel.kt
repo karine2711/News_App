@@ -5,6 +5,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.myapplication.exception.EmptyResponseException
 import com.example.myapplication.models.Article
 import com.example.myapplication.rest.NewsApiService
 import com.example.myapplication.rest.NewsRepo
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 import kotlinx.coroutines.launch
 
+@Suppress("UNCHECKED_CAST")
 class MainViewModel : ViewModel() {
 
     private val _articles = MutableLiveData<Result<List<Article>>>()
@@ -22,22 +24,56 @@ class MainViewModel : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean>
         get() = _isRefreshing.asStateFlow()
+    private val newsRepo = NewsRepo(
+        RetrofitHelper.getInstance().create(NewsApiService::class.java)
+    )
 
-     fun refresh() {
+    fun getArticles() {
         viewModelScope.launch {
+            val prevData: List<Article>? = (_articles.value as? Result.Success<List<Article>>)?.data
             _articles.postValue(Result.loading())
             try {
-                val response = NewsRepo(
-                    RetrofitHelper.getInstance().create(NewsApiService::class.java)
-                ).fetchNews("us")
-                _articles.postValue(Result.success(response))
+                searchByApi(NewsOptions.category, NewsOptions.query)
             } catch (e: Exception) {
-                e.message?.let { Log.e("Couldn't load view model", it) }
-                _articles.postValue(Result.error(e))
+                val filtered = prevData?.let { getFiltered(it, NewsOptions.query) } ?: emptyList()
+                if (filtered.isNotEmpty()) {
+                    _articles.postValue(Result.success(filtered))
+                } else {
+                    _articles.postValue(Result.error(EmptyResponseException("No results found")))
+                }
             }
         }
         _isRefreshing.tryEmit(false)
     }
+
+    private suspend fun searchByApi(category: String?, query: String?) {
+        try {
+            val response = newsRepo.fetchNews(category = category, query = query)
+            if (response.isEmpty()) {
+                throw EmptyResponseException("No results found")
+            }
+            _articles.postValue(Result.success(response))
+        } catch (e: EmptyResponseException) {
+            e.message?.let { Log.e("Couldn't perform search", it) }
+            _articles.postValue(Result.error(e))
+        }
+    }
+
+    private fun getFiltered(articles: List<Article>, query: String?): List<Article> {
+        if (query == null) return articles
+        return articles.filter { a -> containsKeyWord(a, query) }
+    }
+
+    private fun containsKeyWord(
+        a: Article,
+        query: String
+    ) = a.author?.contains(query, true) ?: false ||
+            a.source.name.contains(query) ||
+            a.content.contains(query) ||
+            a.url.contains(query) ||
+            a.description.contains(query) ||
+            a.title.contains(query)
+
 }
 
 sealed class Result<out T : Any> {
